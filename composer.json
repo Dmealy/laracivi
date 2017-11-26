@@ -11,7 +11,8 @@
     ],
     "minimum-stability": "dev",
     "require": {
-        "illuminate/support": "5.5.x-dev"
+        "illuminate/support": "5.5.x-dev",
+        "dmealy/civicrm-core": "dev-master"
     },
     "autoload": {
         "psr-4": {

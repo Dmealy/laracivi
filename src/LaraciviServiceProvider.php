@@ -19,7 +19,7 @@ class LaraciviServiceProvider extends ServiceProvider
         ]);
 
         $installer->install();
-        
+
         if ($this->app->runningInConsole()) {
             $this->commands([
                 CiviMigrate::class,
