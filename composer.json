@@ -21,7 +21,7 @@
     "extra": {
         "laravel": {
             "providers": [
-                "DMealy\\Laracivi\\ServiceProvider"
+                "DMealy\\Laracivi\\LaraciviServiceProvider"
             ],
             "aliases": {
                 "Laracivi": "DMealy\\Laracivi\\Facade"
