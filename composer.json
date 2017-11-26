@@ -17,6 +17,15 @@
         "psr-4": {
             "DMealy\\Laracivi\\": "src/"
         }
-
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "DMealy\\Laracivi\\ServiceProvider"
+            ],
+            "aliases": {
+                "Laracivi": "DMealy\\Laracivi\\Facade"
+            }
+        }
     }
 }

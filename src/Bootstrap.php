@@ -3,23 +3,20 @@ namespace DMealy\Laracivi;
 
 class Bootstrap
 {
-    public function __construct()
-    {
-    }
-
     public function boot()
     {
         $crmDir = base_path('vendor/dmealy/civicrm-core');
+        $settingsDir = base_path('vendor/dmealy/laracivi');
         ini_set('include_path', get_include_path() . PATH_SEPARATOR . $crmDir);
-        $this->settings($crmDir);
+        $this->settings($crmDir, $settingsDir);
         require_once(app_path('Civi/civicrm.settings.php'));
         require_once('api/class.api.php');
     }
 
-    public static function settings($crmDir)
+    protected function settings($crmDir, $settingsDir)
     {
         $tplPath = $crmDir . '/templates/CRM/common';
-        $configFile = base_path('app/Civi') . '/civicrm.settings.php';
+        $configFile = $settingsDir . '/src/civicrm.settings.php';
         $compileDir = $crmDir . '/templates_c';
         if (!file_exists($compileDir)) {
             mkdir($compileDir);

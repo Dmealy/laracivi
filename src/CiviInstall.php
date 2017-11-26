@@ -2,11 +2,18 @@
 namespace DMealy\Laracivi;
 
 use Symfony\Component\Filesystem\Filesystem;
-use Composer\Script\Event;
 use DMealy\Laracivi\CodeGen;
+use DMealy\Laracivi\Bootstrap;
 
-class ComposerScripts
+class CiviInstall
 {
+    private $civiBoot;
+
+    public function __construct(Bootstrap $civiBoot)
+    {
+        $this->civiBoot = $civiBoot;
+    }
+
     /**
      * Move civicrm-packages into civicrm-core.
      * Generate civicrm.mysql scripts and DAO objects.
@@ -15,26 +22,62 @@ class ComposerScripts
      * @param  CodeGen $codeGen
      * @return null
      */
-    public static function civiInstall(Event $event)
+    public function install()
     {
         // Currently in app/Civi
-        $vendorDir = dirname(dirname(__DIR__)) . '/vendor';
-        $crmDir = $vendorDir . '/dmealy/civicrm-core';
-        $packageDir = $vendorDir . '/civicrm/civicrm-packages';
-        $sqlScriptDir = $crmDir . '/sql';
+        $crmDir = base_path('dmealy/civicrm-core');
+        $packageDir = base_path('civicrm/civicrm-packages');
+        $sqlScriptDir = base_path('dmealy/civicrm-core/sql');
         if (file_exists($crmDir)) {
             self::installPackages($crmDir, $packageDir);
-            // self::addNoCmsClasses($crmDir);
             self::generateCode($sqlScriptDir);
             self::setEnvironment();
         }
+        $this->civiBoot->boot();
     }
 
-    public static function installPackages($crmDir, $packageDir)
+    public function installPackages($crmDir, $packageDir)
     {
         $corePackagesDir = $crmDir . '/packages';
         if (file_exists($packageDir) and (! file_exists($corePackagesDir))) {
             rename($packageDir, $corePackagesDir);
+        }
+    }
+
+    public function generateCode($sqlScriptDir)
+    {
+        if (! file_exists($sqlScriptDir . '/civicrm.mysql')) {
+            (new CodeGen())->generate();
+        }
+    }
+
+    public function setEnvironment()
+    {
+        // Add civi DB settings to .env
+        $env = preg_split('/\s+/', file_get_contents(base_path('.env')));
+        $oldEnv = [];
+        foreach ($env as $value) {
+            $val = explode("=", $value, 2);
+            if (!empty($val[0])) {
+                $oldEnv[$val[0]] = (empty($val[1]) ? '' : $val[1]);
+            }
+        }
+        $addEnv = '';
+        $addEnv .= (isset($oldEnv['CIVI_CMS']) ? "" : "CIVI_CMS=NoCms\n");
+        $addEnv .= (isset($oldEnv['CIVI_DB_CONNECTION']) ? "" : "CIVI_DB_CONNECTION=civicrm\n");
+        $addEnv .= (isset($oldEnv['CIVI_DB_DATABASE']) ? "" : "CIVI_DB_DATABASE=civicrm\n");
+        $addEnv .= (isset($oldEnv['CIVI_DB_HOST']) ? "" : "CIVI_DB_HOST=127.0.0.1\n");
+        $addEnv .= (isset($oldEnv['CIVI_DB_PORT']) ? "" : "CIVI_DB_PORT=3306\n");
+        $addEnv .= (isset($oldEnv['CIVI_DB_USERNAME']) ? ""
+            : "CIVI_DB_USERNAME=" . (isset($oldEnv['DB_USERNAME']) ? $oldEnv['DB_USERNAME'] : "civiuser") . "\n");
+        $addEnv .= (isset($oldEnv['CIVI_DB_PASSWORD']) ? ""
+            : "CIVI_DB_PASSWORD=" . (isset($oldEnv['CIVI_DB_PASSWORD']) ? $oldEnv['CIVI_DB_PASSWORD'] : "secret") . "\n");
+        $newEnv = '';
+        if ($addEnv != '') {
+            $addEnv = "\n" . $addEnv;
+            $oldEnv = file_get_contents(base_path('.env'));
+            $newEnv = $oldEnv . $addEnv;
+            file_put_contents(base_path('.env'), $newEnv);
         }
     }
 
@@ -44,7 +87,7 @@ class ComposerScripts
      *
      * @param string $crmDir
      */
-    public static function addNoCmsClasses($crmDir)
+    public function addNoCmsClasses($crmDir)
     {
         // $noCmsSysFile = $crmDir . '/CRM/Utils/System/NoCms.php';
         // if (! file_exists($noCmsSysFile)) {
@@ -99,43 +142,6 @@ class ComposerScripts
 
     }
 
-    public static function generateCode($sqlScriptDir)
-    {
-        if (! file_exists($sqlScriptDir . '/civicrm.mysql')) {
-            (new CodeGen())->generate();
-        }
-    }
-
-    public static function setEnvironment()
-    {
-        // Add civi DB settings to .env
-        $env = preg_split('/\s+/', file_get_contents(base_path('.env')));
-        $oldEnv = [];
-        foreach ($env as $value) {
-            $val = explode("=", $value, 2);
-            if (!empty($val[0])) {
-                $oldEnv[$val[0]] = (empty($val[1]) ? '' : $val[1]);
-            }
-        }
-        $addEnv = '';
-        $addEnv .= (isset($oldEnv['CIVI_CMS']) ? "" : "CIVI_CMS=NoCms\n");
-        $addEnv .= (isset($oldEnv['CIVI_DB_CONNECTION']) ? "" : "CIVI_DB_CONNECTION=civicrm\n");
-        $addEnv .= (isset($oldEnv['CIVI_DB_DATABASE']) ? "" : "CIVI_DB_DATABASE=civicrm\n");
-        $addEnv .= (isset($oldEnv['CIVI_DB_HOST']) ? "" : "CIVI_DB_HOST=127.0.0.1\n");
-        $addEnv .= (isset($oldEnv['CIVI_DB_PORT']) ? "" : "CIVI_DB_PORT=3306\n");
-        $addEnv .= (isset($oldEnv['CIVI_DB_USERNAME']) ? ""
-            : "CIVI_DB_USERNAME=" . (isset($oldEnv['DB_USERNAME']) ? $oldEnv['DB_USERNAME'] : "civiuser") . "\n");
-        $addEnv .= (isset($oldEnv['CIVI_DB_PASSWORD']) ? ""
-            : "CIVI_DB_PASSWORD=" . (isset($oldEnv['CIVI_DB_PASSWORD']) ? $oldEnv['CIVI_DB_PASSWORD'] : "secret") . "\n");
-        $newEnv = '';
-        if ($addEnv != '') {
-            $addEnv = "\n" . $addEnv;
-            $oldEnv = file_get_contents(base_path('.env'));
-            $newEnv = $oldEnv . $addEnv;
-            file_put_contents(base_path('.env'), $newEnv);
-            echo "Added CIVI_DB_ environment variables to .env\n";
-        }
-    }
 
 
 }
