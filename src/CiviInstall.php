@@ -25,9 +25,9 @@ class CiviInstall
     public function install()
     {
         // Currently in app/Civi
-        $crmDir = base_path('dmealy/civicrm-core');
-        $packageDir = base_path('civicrm/civicrm-packages');
-        $sqlScriptDir = base_path('dmealy/civicrm-core/sql');
+        $crmDir = base_path('vendor/dmealy/civicrm-core');
+        $packageDir = base_path('vendor/civicrm/civicrm-packages');
+        $sqlScriptDir = base_path('vendor/dmealy/civicrm-core/sql');
         if (file_exists($crmDir)) {
             self::installPackages($crmDir, $packageDir);
             self::generateCode($sqlScriptDir);

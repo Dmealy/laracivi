@@ -9,7 +9,7 @@ class Bootstrap
         $settingsDir = base_path('vendor/dmealy/laracivi');
         ini_set('include_path', get_include_path() . PATH_SEPARATOR . $crmDir);
         $this->settings($crmDir, $settingsDir);
-        require_once(app_path('Civi/civicrm.settings.php'));
+        require_once($settingsDir . '/src/civicrm.settings.php');
         require_once('api/class.api.php');
     }
 
@@ -48,7 +48,7 @@ class Bootstrap
             'CMSdbName' => addslashes($dbName),
             'siteKey' => env('APP_KEY', md5(rand() . mt_rand() . rand() . uniqid('', true))),
         ];
-        $configFile = base_path('app/Civi') . '/civicrm.settings.php';
+        $configFile = $settingsDir . '/src/civicrm.settings.php';
         $tplRaw = file_get_contents($tplPath . '/civicrm.settings.php.template');
         foreach ($params as $key => $value) {
             $tplRaw = str_replace('%%' . $key . '%%', $value, $tplRaw);
