@@ -18,7 +18,9 @@ class LaraciviServiceProvider extends ServiceProvider
             __DIR__.'/src/civicrm.php' => config_path('civicrm.php'),
         ]);
 
-        $installer->install();
+        if (!$this->app->runningInConsole()) {
+            $installer->install();
+        }
 
         if ($this->app->runningInConsole()) {
             $this->commands([
