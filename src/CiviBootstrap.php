@@ -1,7 +1,7 @@
 <?php
 namespace DMealy\Laracivi;
 
-class Bootstrap
+class CiviBootstrap
 {
     public function boot()
     {

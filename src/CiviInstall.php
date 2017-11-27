@@ -3,17 +3,9 @@ namespace DMealy\Laracivi;
 
 use Symfony\Component\Filesystem\Filesystem;
 use DMealy\Laracivi\CodeGen;
-use DMealy\Laracivi\Bootstrap;
 
 class CiviInstall
 {
-    private $civiBoot;
-
-    public function __construct(Bootstrap $civiBoot)
-    {
-        $this->civiBoot = $civiBoot;
-    }
-
     /**
      * Move civicrm-packages into civicrm-core.
      * Generate civicrm.mysql scripts and DAO objects.
@@ -33,7 +25,6 @@ class CiviInstall
             self::generateCode($sqlScriptDir);
             self::setEnvironment();
         }
-        $this->civiBoot->boot();
     }
 
     public function installPackages($crmDir, $packageDir)
@@ -51,9 +42,11 @@ class CiviInstall
         }
     }
 
+    /**
+     * Adds CiviCRM-specific values to the .env file.
+     */
     public function setEnvironment()
     {
-        // Add civi DB settings to .env
         $env = preg_split('/\s+/', file_get_contents(base_path('.env')));
         $oldEnv = [];
         foreach ($env as $value) {
