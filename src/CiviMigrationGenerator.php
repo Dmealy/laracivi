@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Schema;
 class CiviMigrationGenerator
 {
     protected $schema;
+    protected $schemaXml;
 
     /**
      * Convert civi types to Laravel Migration Types
@@ -21,12 +22,12 @@ class CiviMigrationGenerator
 
     public function generate()
     {
-        $schemaXml = $this->getSchema();
+        $this->schemaXml = $this->getSchema();
         $this->schema['database'] = [
-            'name' => trim((string) $schemaXml->name),
-            'comment' => $this->value('comment', $schemaXml, '')
+            'name' => trim((string) $this->schemaXml->name),
+            'comment' => $this->value('comment', $this->schemaXml, '')
         ];
-        $this->generateTablesAndIndices($schemaXml);
+        $this->generateTablesAndIndices();
 
         return 'NOT YET DONE  Civicrm migration created.';
     }
@@ -50,25 +51,25 @@ class CiviMigrationGenerator
     }
 
 
-    protected function generateTablesAndIndices($tableSchema)
+    protected function generateTablesAndIndices()
     {
         $this->schema['tables'] = [];
-        foreach ($tableSchema->tables as $tableGroup) {
+        foreach ($this->schemaXml->tables as $tableGroup) {
             foreach ($tableGroup as $table) {
                 $name = $this->value('name', $table);
                 $this->schema['tables'][$name] = [
                     'name' => $name,
                     'comment' => $this->value('comment', $table),
                 ];
-                $this->schema['tables'][$name]['fields'] = $this->getFields($table->field);
+                $this->schema['tables'][$name]['fields'] = $this->getFields($table);
             }
         }
     }
 
-    protected function getFields($columns)
+    protected function getFields($tableXml)
     {
         $fields = array();
-        foreach ($columns as $values) {
+        foreach ($tableXml->field as $values) {
             $name = $this->value('name', $values);
             $name = $this->getField('name', $values);
             $type = $this->getField('type', $values);
