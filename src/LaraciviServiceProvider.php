@@ -34,6 +34,7 @@ class LaraciviServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 CiviMigrate::class,
+                MakeMigrationCivi::class,
             ]);
         }
     }
