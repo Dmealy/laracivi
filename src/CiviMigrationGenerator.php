@@ -20,6 +20,7 @@ class CiviMigrationGenerator
         'blob'     => 'binary',
     ];
 
+
     public function generate()
     {
         $this->schemaXml = $this->getSchema();
@@ -27,7 +28,7 @@ class CiviMigrationGenerator
             'name' => trim((string) $this->schemaXml->name),
             'comment' => $this->value('comment', $this->schemaXml, '')
         ];
-        $this->generateTablesAndIndices();
+        $this->generateMigrationSchema();
 
         return 'NOT YET DONE  Civicrm migration created.';
     }
@@ -51,7 +52,7 @@ class CiviMigrationGenerator
     }
 
 
-    protected function generateTablesAndIndices()
+    protected function generateMigrationSchema()
     {
         $this->schema['tables'] = [];
         foreach ($this->schemaXml->tables as $tableGroup) {
@@ -61,7 +62,10 @@ class CiviMigrationGenerator
                     'name' => $name,
                     'comment' => $this->value('comment', $table),
                 ];
-                $this->schema['tables'][$name]['fields'] = $this->getFields($table);
+                $results = $this->getFields($table);
+                $results = array_merge($results, $this->getIndices($table));
+                $this->schema['tables'][$name]['fields'] = $results;
+                $this->schema['tables'][$name]['foreignkeys'] = $this->getForiegnKeys($table);
             }
         }
     }
@@ -70,7 +74,6 @@ class CiviMigrationGenerator
     {
         $fields = array();
         foreach ($tableXml->field as $values) {
-            $name = $this->value('name', $values);
             $name = $this->getField('name', $values);
             $type = $this->getField('type', $values);
             $length = $this->getField('length', $values);
@@ -80,31 +83,19 @@ class CiviMigrationGenerator
             }
             $nullable = $this->getField('nullable', $values);
             $comment = $this->getField('comment', $values);
-            $unsigned = $this->getField('unsigned', $values);
-            $autoincrement = $this->getField('autoincrement', $values);
+            $unsigned = empty($unsigned) ? $this->getField('unsigned', $values) : $unsigned;
             $precision = $this->getField('precision', $values);
             $scale = $this->getField('scale', $values);
             $index = '';
             $decorators = null;
             $args = null;
-            if (isset($this->fieldTypeMap[$type])) {
-                $type = $this->fieldTypeMap[$type];
-            }
 
-            // Different rules for different type groups
-            if (in_array($type, ['tinyInteger', 'smallInteger', 'integer', 'bigInteger'])) {
-                // Integer
-                if ($type == 'integer' and $unsigned and $autoincrement) {
+            if (in_array($type, ['tinyInteger', 'smallInteger', 'integer', 'bigInteger', 'int unsigned'])) {
+                if ($tableXml->primaryKey->name == $name and $tableXml->primaryKey->autoincrement == 'true') {
                     $type = 'increments';
-                    $index = null;
-                } else {
-                    if ($unsigned) {
-                        $decorators[] = 'unsigned';
-                    }
-                    if ($autoincrement) {
-                        $args = 'true';
-                        $index = null;
-                    }
+                } elseif ($type == 'int unsigned') {
+                    $type = 'integer';
+                    $unsigned = 'unsigned';
                 }
             } elseif ($type == 'dateTime') {
                 if ($name == 'deleted_at' and $nullable) {
@@ -121,19 +112,18 @@ class CiviMigrationGenerator
             } elseif (in_array($type, ['decimal', 'float', 'double'])) {
                 // Precision based numbers
                 $args = $this->getPrecision($precision, $scale);
-                if ($unsigned) {
-                    $decorators[] = 'unsigned';
-                }
             } else {
-                // Probably not a number (string/char)
-                if ($type === 'string') {
-                    $type = 'char';
+                if ($type === 'varchar') {
+                    $type = 'string';
                 }
                 $args = $this->getLength($length);
             }
 
             if ($nullable) {
                 $decorators[] = 'nullable';
+            }
+            if ($unsigned) {
+                $decorators[] = 'unsigned';
             }
             if ($default !== null) {
                 $decorators[] = $this->getDefault($default, $type);
@@ -144,7 +134,6 @@ class CiviMigrationGenerator
             if ($comment) {
                 $decorators[] = "comment('" . addcslashes($comment, "\\'") . "')";
             }
-
             $field = ['field' => $name, 'type' => $type];
             if ($decorators) {
                 $field['decorators'] = $decorators;
@@ -154,7 +143,55 @@ class CiviMigrationGenerator
             }
             $fields[$name] = $field;
         }
+
         return $fields;
+    }
+
+    protected function getIndices($tableXml)
+    {
+        $indices = array();
+        foreach ($tableXml->index as $values) {
+            $name = $this->getField('name', $values);
+            $type = $this->getField('unique', $values) ? 'unique' : 'index';
+            $fields = [];
+            foreach ($values->fieldName as $key => $fieldName) {
+                $fields[] = (string) $fieldName;
+            }
+            if (!$name) {
+                $name = 'index_' . implode('_', $fields);
+            }
+            $indices[$name] = [
+                'field' => $fields,
+                'type' => $type,
+                'args' => $name,
+            ];
+        }
+
+        return $indices;
+    }
+
+    protected function getForiegnKeys($tableXml)
+    {
+        $constraints = array();
+        foreach ($tableXml->foreignKey as $values) {
+            $field = $this->getField('name', $values);
+            $type = 'foreign';
+            $table = $this->getField('table', $values);
+            $key = $this->getField('key', $values);
+            $onDelete = $this->getField('onDelete', $values);
+            $onUpdate = ($this->getField('onUpdate', $values) ?: 'restrict');
+            $name = 'fk_' . camel_case($table) . '_' . $field;
+            $constraints[$name] = [
+                'name' => $name,
+                'field' => $field,
+                'references' => $key,
+                'on' => $table,
+                'onUpdate' => $onUpdate,
+                'onDelete' => $onDelete,
+            ];
+        }
+
+        return $constraints;
     }
 
     /**
@@ -167,35 +204,16 @@ class CiviMigrationGenerator
     protected function getField($key, $value)
     {
         $result = $this->value($key, $value);
-        if ($key == 'name') {
-            return $result;
-        }
         if ($key == 'nullable' and empty($this->value('required', $value))) {
             return 'nullable';
-        }
-        if ($key == 'autoincrement' and !empty($result)) {
-            return 'autoincrement';
-        }
-        if ($key == 'default' and !empty($result)) {
-            return "{$result}";
-        }
-        if ($key == 'type' and !empty($result)) {
-            if ($result == 'int') {
-                return 'integer';
-            }
-            return "{$result}";
         }
         if ($key == 'unsigned' and !empty($this->value('type', $value))) {
             if ($this->value('type', $value) == 'int unsigned') {
                 return 'unsigned';
             }
-            return '';
-        }
-        if ($key == 'comment' and !empty($result)) {
-            return "{$result}";
         }
 
-        return null;
+        return $result;
     }
 
     /**
